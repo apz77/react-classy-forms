@@ -1,0 +1,37 @@
+{
+  "name": "react-classy-forms",
+  "version": "1.0.0",
+  "description": "Classy forms for react apps",
+  "main": "./dist/index.js",
+  "typings": "./typings/index.d.ts",
+  "scripts": {
+    "build": "tsc -p ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apz77/react-classy-forms.git"
+  },
+  "keywords": [
+    "react",
+    "forms",
+    "typescript",
+    "mobx"
+  ],
+  "author": "belobrov.n@gmail.com",
+  "license": "MIT",
+  "homepage": "https://github.com/apz77/react-classy-forms#readme",
+  "bugs": {
+    "url": "https://github.com/apz77/react-classy-forms/issues"
+  },
+  "devDependencies": {
+    "@types/react": "^16.4.1",
+    "tslint": "^5.9.1",
+    "tslint-config-airbnb": "^5.8.0",
+    "typescript": "^2.7.2"
+  },
+  "dependencies": {
+    "mobx": "^5.0.3",
+    "mobx-react": "^5.2.3",
+    "react": "^16.4.1"
+  }
+}

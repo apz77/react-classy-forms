@@ -1,0 +1,13 @@
+{
+  "extends": "tslint-config-airbnb",
+  "linebreak-style": [true, "LF"],
+  "rules": {
+    "max-line-length": [
+      true,
+      120
+    ]
+  },
+  "no-else-after-return": false,
+  "object-shorthand-properties-first": false,
+  "no-shadowed-variable": true
+}
