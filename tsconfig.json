@@ -2,6 +2,7 @@
   "compilerOptions": {
     "forceConsistentCasingInFileNames": true,
     "lib": ["es6", "dom"],
+    "jsx": "react",
     "module": "commonjs",
     "noLib": false,
     "outDir": "./dist",

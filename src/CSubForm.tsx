@@ -1,35 +1,33 @@
 import * as React from 'react';
-import { FormFieldMetadata, FormManagedInputProps, isFormFieldMetadata, IInput } from './formTypes';
-import { observer } from 'mobx-react/native';
-import { IObservableObject, isObservableObject, observable, set } from 'mobx';
-import { CFormManagedInput } from './CFormManaged';
-import {BaseModel, isArray, isObject} from 'swagger-ts-types';
-import { inject, Log } from 'modelsApi';
+import {
+  FormFieldMetadata,
+  FormManagedInputProps,
+  isFormFieldMetadata,
+  IInput,
+  CFormManagedInput,
+  BaseFormData,
+} from './formTypes';
+import { isArray, isObject } from './utils';
 
-interface CBaseFormProps<T extends BaseModel> extends FormManagedInputProps<T> {
+interface CBaseFormProps<T extends BaseFormData> extends FormManagedInputProps<T> {
   fields?: {[key: string]: FormFieldMetadata};  // Fields metadata
-  autoNext?: boolean;                  // Auto focus next input in the form on onSubmitEditing event
-  autoSubmitOnLastInput?: boolean;     // Auto call obSubmit if the last input got onSubmitEditing event
+  autoNext?: boolean;                  // Auto focus next input in the form on Enter key press
+  autoSubmitOnLastInput?: boolean;     // Auto call obSubmit if the last input got Enter key press
   className?: string;
 }
 
 /**
- * CForm has guided loginItemStyle and can control focus of it's inputs
+ * CForm can control focus of it's inputs
  */
-@observer
-@inject
-export class CSubForm<T extends BaseModel, P extends CBaseFormProps<T> = CBaseFormProps<T>>
-  extends CFormManagedInput<T, P, T> {
+export class CSubForm<T extends BaseFormData, P extends CBaseFormProps<T> = CBaseFormProps<T>, S extends BaseFormData = {}>
+  extends CFormManagedInput<T, P, T & S> {
 
   protected inputRefs: (IInput | null)[] = [];
   protected inputIndex: number = 0;
 
-  @inject
-  private log: Log;
-
   static defaultProps = {
     autoNext: true,
-    autoSubmitOnLastInput: false,
+    autoSubmitOnLastInput: true,
   };
 
   constructor(props: P, context: any) {
@@ -37,6 +35,9 @@ export class CSubForm<T extends BaseModel, P extends CBaseFormProps<T> = CBaseFo
     this.state = this.getState(props);
   }
 
+  /**
+   * Focus the first controllable input instanceof CFormManagedInput
+   */
   public focus(): void {
     const firstInput = this.inputRefs.length && this.inputRefs[0];
     if (firstInput) {
@@ -44,7 +45,7 @@ export class CSubForm<T extends BaseModel, P extends CBaseFormProps<T> = CBaseFo
     }
   }
 
-  protected getState(props: P): T {
+  protected getState(props: P): T & S {
     const { fields, value } = props;
 
     const result: any = {};
@@ -54,12 +55,7 @@ export class CSubForm<T extends BaseModel, P extends CBaseFormProps<T> = CBaseFo
       }
     }
 
-    if (isObservableObject(value)) {
-      set(value, result);
-      return value as (T & IObservableObject);
-    }
-
-    return result as T;
+    return result as T & S;
   }
 
   componentWillReceiveProps(nextProps: Readonly<P>, nextContext: any): void {
@@ -94,7 +90,6 @@ export class CSubForm<T extends BaseModel, P extends CBaseFormProps<T> = CBaseFo
     }
 
     if (autoSubmitOnLastInput && index === this.inputRefs.length - 1) {
-      const lastInput = this.inputRefs[this.inputRefs.length - 1];
       this.onLastInputEndEditing();
     }
   }
@@ -108,8 +103,13 @@ export class CSubForm<T extends BaseModel, P extends CBaseFormProps<T> = CBaseFo
     const { onChange } = this.props;
     this.setState({ [name]: value });
     if (onChange) {
-      onChange(this.state);
+      onChange(this.state as any as T);
     }
+  }
+
+
+  protected modifyProps(child: React.ReactElement<any>, indexInParent: number): React.ReactElement<any> {
+    return React.cloneElement(child, this.getNewProps(child, indexInParent));
   }
 
   protected getNewProps(child: React.ReactElement<any>, indexInParent: number): any {
@@ -138,7 +138,8 @@ export class CSubForm<T extends BaseModel, P extends CBaseFormProps<T> = CBaseFo
         if (this.state.hasOwnProperty(child.props.field.name)) {
           newProps.value = this.state[child.props.field.name];
         } else {
-          this.log.warning(`An Input component has field metadata, but CForm has no field ${child.props.field.name}`);
+          // TODO: Move everything to globbal logger
+          console.warn(`An Input component has field metadata, but CForm has no field ${child.props.field.name}`);
         }
 
         newProps.onChange = (value: any) => {
@@ -158,15 +159,10 @@ export class CSubForm<T extends BaseModel, P extends CBaseFormProps<T> = CBaseFo
     }
 
     // Avoid unneeded recursion
-    if (isObject(child.type) && !((child.type as any).prototype instanceof CFormManagedInput)) {
+    if (!isObject(child.type) || !((child.type as any).prototype instanceof CFormManagedInput)) {
       newProps.children = this.processChildren(child.props);
     }
 
     return newProps;
   }
-
-  protected modifyProps(child: React.ReactElement<any>, indexInParent: number): React.ReactElement<any> {
-    return React.cloneElement(child, this.getNewProps(child, indexInParent));
-  }
-
 }
