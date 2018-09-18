@@ -15,6 +15,7 @@ interface CFormProps<T extends BaseFormValue> extends CSubFormProps<T> {
   onSubmit?: (value: T) => void | undefined | Promise<any>;
   submitPromise?: Promise<any> | undefined; // submit promise to disable form while promise is pending
   isValid?: (value: T) => boolean; // Check if value is valid to prevent submit and disable submit button
+  isLoading?: boolean; // This is special case, when providing promise in onSubmit is some cumbersome
 }
 
 interface CFormState<T extends BaseFormValue> extends CSubFormState<T> {
@@ -33,7 +34,7 @@ export class CForm<T extends BaseFormValue> extends CSubForm<T, CFormProps<T>, C
   }
 
   public get isLoading() {
-    return this.state.isLoading;
+    return this.state.isLoading || this.props.isLoading;
   }
 
   componentWillReceiveProps(nextProps: Readonly<CFormProps<T>>, nextContext: any): void {
