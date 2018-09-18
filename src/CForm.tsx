@@ -110,7 +110,6 @@ export class CForm<T extends BaseFormValue> extends CSubForm<T, CFormProps<T>, C
           }
           this.onSubmit();
         };
-
       }
 
       if (isValid) {

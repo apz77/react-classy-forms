@@ -5,7 +5,7 @@
 2. Make it easy to work with auto-generated API intefaces.
 3. Take care of reaction on validation, submission, disabling a form.
 4. Provide basic type checking via typescript.
-5. Should work woth in React and ReactNative.
+5. Should work with in React and ReactNative.
 
 ## Basic Usage of CForm
 Both CForm and CSubForm are not UI components, they render React.Fragment

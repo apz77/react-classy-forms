@@ -24,7 +24,7 @@ export class CSubForm<
   T extends BaseFormValue,
   P extends CSubFormProps<T> = CSubFormProps<T>,
   S extends CSubFormState<T> = CSubFormState<T>
-> extends CFormManagedInput<T, P, S> {
+  > extends CFormManagedInput<T, P, S> {
   protected inputRefs: (CFormManagedInput<any, any> | null)[] = [];
   protected inputIndex: number = 0;
 
@@ -130,8 +130,8 @@ export class CSubForm<
 
           // TODO: Do we need this?
           /*if (child.props.ref) {
-            return child.props.ref.call(ref);
-          }*/
+           return child.props.ref.call(ref);
+           }*/
         };
       })(this.inputIndex);
 
