@@ -1,33 +1,36 @@
 import * as React from 'react';
 import {
+  BaseFormValue,
+  CFormManagedInput,
   FormFieldMetadata,
   FormManagedInputProps,
   isFormFieldMetadata,
-  IInput,
-  CFormManagedInput,
-  BaseFormData,
 } from './formTypes';
-import { isArray, isObject } from './utils';
 
-interface CBaseFormProps<T extends BaseFormData> extends FormManagedInputProps<T> {
-  fields?: {[key: string]: FormFieldMetadata};  // Fields metadata
-  autoNext?: boolean;                  // Auto focus next input in the form on Enter key press
-  autoSubmitOnLastInput?: boolean;     // Auto call obSubmit if the last input got Enter key press
-  className?: string;
+export interface CSubFormProps<T extends BaseFormValue> extends FormManagedInputProps<T> {
+  fields?: { [key: string]: FormFieldMetadata } | (keyof T)[]; // Fields metadata
+  autoNext?: boolean; // Auto focus next input in the form on onSubmitEditing event
+  autoSubmitOnLastInput?: boolean; // Auto call obSubmit if the last input got onSubmitEditing event
+}
+
+export interface CSubFormState<T extends BaseFormValue> {
+  value: T;
 }
 
 /**
- * CForm can control focus of it's inputs
+ * CForm has guided loginItemStyle and can control focus of it's inputs
  */
-export class CSubForm<T extends BaseFormData, P extends CBaseFormProps<T> = CBaseFormProps<T>, S extends BaseFormData = {}>
-  extends CFormManagedInput<T, P, T & S> {
-
-  protected inputRefs: (IInput | null)[] = [];
+export class CSubForm<
+  T extends BaseFormValue,
+  P extends CSubFormProps<T> = CSubFormProps<T>,
+  S extends CSubFormState<T> = CSubFormState<T>
+> extends CFormManagedInput<T, P, S> {
+  protected inputRefs: (CFormManagedInput<any, any> | null)[] = [];
   protected inputIndex: number = 0;
 
   static defaultProps = {
     autoNext: true,
-    autoSubmitOnLastInput: true,
+    autoSubmitOnLastInput: false,
   };
 
   constructor(props: P, context: any) {
@@ -36,26 +39,13 @@ export class CSubForm<T extends BaseFormData, P extends CBaseFormProps<T> = CBas
   }
 
   /**
-   * Focus the first controllable input instanceof CFormManagedInput
+   * Focus on the first manageable inputs
    */
   public focus(): void {
     const firstInput = this.inputRefs.length && this.inputRefs[0];
     if (firstInput) {
       firstInput.focus();
     }
-  }
-
-  protected getState(props: P): T & S {
-    const { fields, value } = props;
-
-    const result: any = {};
-    if (fields) {
-      for (const fieldName in fields) {
-        result[fieldName] = value && (fieldName in value) ? value[fieldName] : void 0;
-      }
-    }
-
-    return result as T & S;
   }
 
   componentWillReceiveProps(nextProps: Readonly<P>, nextContext: any): void {
@@ -66,26 +56,38 @@ export class CSubForm<T extends BaseFormData, P extends CBaseFormProps<T> = CBas
 
   render() {
     this.inputIndex = 0;
-    return <div className={this.props.className}>
-      {this.processChildren(this.props)}
-    </div>;
+    return <React.Fragment>{this.processChildren(this.props)}</React.Fragment>;
   }
 
-  protected processChildren(props: {children?: React.ReactNode}) {
+  protected getState(props: P): S {
+    const { fields, value } = props;
+
+    const result: any = {};
+    if (fields) {
+      for (const fieldKey in fields) {
+        const fieldName = isFormFieldMetadata((fields as any)[fieldKey]) ? (fields as any)[fieldKey].name : (fields as any)[fieldKey];
+        result[fieldName] = value && fieldName in value ? value[fieldName] : void 0;
+      }
+    }
+
+    return { value: result } as S;
+  }
+
+  protected processChildren(props: { children?: React.ReactNode }) {
     const children = this.getChildren(props);
-    return children.map((child, index) => React.isValidElement(child) ? this.modifyProps(child, index) : child);
+    return children.map((child, index) => (React.isValidElement(child) ? this.modifyProps(child, index) : child));
   }
 
-  protected getChildren(props: {children?: React.ReactNode}): React.ReactNode[] {
-    return (isArray(props.children) ? props.children as React.ReactNode[] : [props.children]);
+  protected getChildren(props: { children?: React.ReactNode }): React.ReactNode[] {
+    return Array.isArray(props.children) ? (props.children as React.ReactNode[]) : [props.children];
   }
 
   protected onChildInputEndEditing(index: number) {
     const { autoNext, autoSubmitOnLastInput } = this.props;
     if (autoNext && index < this.inputRefs.length - 1) {
-      const nextInput = this.inputRefs[index + 1];
-      if (nextInput) {
-        nextInput.focus();
+      const nextCInput = this.inputRefs[index + 1];
+      if (nextCInput && nextCInput.focus) {
+        nextCInput.focus();
       }
     }
 
@@ -99,24 +101,22 @@ export class CSubForm<T extends BaseFormData, P extends CBaseFormProps<T> = CBas
     onSubmitEditing && onSubmitEditing();
   }
 
-  protected onChildChange(name: string, value: any) {
+  protected onChildChange(name: string, fieldValue: any) {
     const { onChange } = this.props;
-    this.setState({ [name]: value });
-    if (onChange) {
-      onChange(this.state as any as T);
-    }
-  }
-
-
-  protected modifyProps(child: React.ReactElement<any>, indexInParent: number): React.ReactElement<any> {
-    return React.cloneElement(child, this.getNewProps(child, indexInParent));
+    const { value } = this.state;
+    value[name] = fieldValue;
+    this.setState({ value }, () => {
+      if (onChange) {
+        onChange(value);
+      }
+    });
   }
 
   protected getNewProps(child: React.ReactElement<any>, indexInParent: number): any {
     const { disabled } = this.props;
-    const newProps: {[key: string]: any} = {};
+    const newProps: { [key: string]: any } = {};
 
-    if (isObject(child.type) && ((child.type as any).prototype instanceof CFormManagedInput)) {
+    if (CFormManagedInput.isPrototypeOf(child.type)) {
       ((inputIndex: number) => {
         newProps.disabled = child.props.disabled || disabled;
         newProps.onSubmitEditing = (...args: any[]) => {
@@ -125,25 +125,28 @@ export class CSubForm<T extends BaseFormData, P extends CBaseFormProps<T> = CBas
             child.props.onSubmitEditing.call(args);
           }
         };
-        newProps.ref = (ref: IInput | null) => {
+        newProps.ref = (ref: CFormManagedInput<any, any> | null) => {
           this.inputRefs[inputIndex] = ref;
-          if (child.props.ref) {
+
+          // TODO: Do we need this?
+          /*if (child.props.ref) {
             return child.props.ref.call(ref);
-          }
+          }*/
         };
       })(this.inputIndex);
 
       // Add "value" and "onChange" if we have metadata
-      if (isFormFieldMetadata(child.props.field)) {
-        if (this.state.hasOwnProperty(child.props.field.name)) {
-          newProps.value = this.state[child.props.field.name];
+      if (child.props.field) {
+        const { value } = this.state;
+        const fieldName = isFormFieldMetadata(child.props.field) ? child.props.field.name : child.props.field;
+        if (value.hasOwnProperty(fieldName)) {
+          newProps.value = value[fieldName];
         } else {
-          // TODO: Move everything to globbal logger
-          console.warn(`An Input component has field metadata, but CForm has no field ${child.props.field.name}`);
+          console.warn(`An CInput has field metadata, but CForm has no field ${fieldName}`);
         }
 
         newProps.onChange = (value: any) => {
-          this.onChildChange(child.props.field.name, value);
+          this.onChildChange(fieldName, value);
           if (child.props.onChange) {
             child.props.onChange(value);
           }
@@ -154,15 +157,27 @@ export class CSubForm<T extends BaseFormData, P extends CBaseFormProps<T> = CBas
     }
 
     if (!child.key) {
-      const { field } = child.props;
-      newProps.key = isFormFieldMetadata(field) ? `formKey${field.name}` : `formKey${indexInParent}`;
+      newProps.key = `formKey${indexInParent}`;
+    }
+
+    // Scan rest of the props for being valid JSX elements
+    let propsElementIndex = 0;
+    for (const childProp in child.props) {
+      if (childProp !== 'children' && React.isValidElement(child.props[childProp])) {
+        newProps[childProp] = this.modifyProps(child.props[childProp], propsElementIndex);
+        propsElementIndex = propsElementIndex + 1;
+      }
     }
 
     // Avoid unneeded recursion
-    if (!isObject(child.type) || !((child.type as any).prototype instanceof CFormManagedInput)) {
+    if (!CFormManagedInput.isPrototypeOf(child.type)) {
       newProps.children = this.processChildren(child.props);
     }
 
     return newProps;
+  }
+
+  protected modifyProps(child: React.ReactElement<any>, indexInParent: number): React.ReactElement<any> {
+    return React.cloneElement(child, this.getNewProps(child, indexInParent));
   }
 }

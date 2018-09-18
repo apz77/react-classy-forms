@@ -1,41 +1,43 @@
 import * as React from 'react';
-import { FormFieldMetadata, CFormManagedControl, CFormManagedInput, BaseFormData } from './formTypes';
-import { CSubForm } from './CSubForm';
-import { isObject } from './utils';
+import { BaseFormValue, CFormManagedControl, CFormManagedInput } from './formTypes';
+import { CSubForm, CSubFormProps, CSubFormState } from './CSubForm';
 
-interface CMainFormProps<T extends BaseFormData> {
-  fields?: { [key: string]: FormFieldMetadata }; // Fields metadata
-  value?: Partial<T>;
-  disabled?: boolean;
-  onChange?: (value: T) => void; // Global form onChange
-  autoNext?: boolean; // Auto focus next input in the form on onSubmitEditing event
-  autoSubmitOnLastInput?: boolean; // Auto call obSubmit if the last input got onSubmitEditing event
+interface CFormProps<T extends BaseFormValue> extends CSubFormProps<T> {
+  // Inherited props:
+
+  // fields?: { [key: string]: FormFieldMetadata }; // Fields metadata
+  // autoNext?: boolean; // Auto focus next input in the form on onSubmitEditing event
+  // autoSubmitOnLastInput?: boolean; // Auto call obSubmit if the last input got onSubmitEditing event
+  // value?: Partial<T>;
+  // onChange?: (value: T) => void;
+  // disabled?: boolean;
+
   onSubmit?: (value: T) => void | undefined | Promise<any>;
   submitPromise?: Promise<any> | undefined; // submit promise to disable form while promise is pending
   isValid?: (value: T) => boolean; // Check if value is valid to prevent submit and disable submit button
-  isLoading?: boolean; // External isLoading control
 }
 
-interface CFormState {
+interface CFormState<T extends BaseFormValue> extends CSubFormState<T> {
   isLoading: boolean;
 }
 
 /**
- * CForm has guided loginItemStyle and can control focus of it's inputs
+ * CForm has guided style and can control focus of it's inputs
  */
-export class CForm<T extends BaseFormData> extends CSubForm<T, CMainFormProps<T>, CFormState> {
-
-  constructor(props: CMainFormProps<T>, context: any) {
+export class CForm<T extends BaseFormValue> extends CSubForm<T, CFormProps<T>, CFormState<T>> {
+  constructor(props: CFormProps<T>, context: any) {
     super(props, context);
     if (props.submitPromise) {
       this.bindToSubmitPromise(props.submitPromise);
     }
   }
 
-  componentWillReceiveProps(nextProps: Readonly<CMainFormProps<T>>, nextContext: any): void {
-    if (nextProps.value !== this.props.value || nextProps.isLoading !== this.props.isLoading) {
-      this.setState(this.getState(nextProps));
-    }
+  public get isLoading() {
+    return this.state.isLoading;
+  }
+
+  componentWillReceiveProps(nextProps: Readonly<CFormProps<T>>, nextContext: any): void {
+    super.componentWillReceiveProps(nextProps, nextContext);
 
     if (nextProps.submitPromise !== this.props.submitPromise) {
       this.setIsLoading(true);
@@ -48,17 +50,19 @@ export class CForm<T extends BaseFormData> extends CSubForm<T, CMainFormProps<T>
 
   render() {
     this.inputIndex = 0;
-    return <form>{this.processChildren(this.props)}</form>;
+    return <React.Fragment>{this.processChildren(this.props)}</React.Fragment>;
   }
 
-  protected getState(props: CMainFormProps<T>): CFormState & T {
-    const result = super.getState(props);
-    if (props.isLoading !== void 0) {
-      result.isLoading = props.isLoading;
-    }
-    return result;
+  protected setIsLoading(value: boolean) {
+    this.setState({
+      isLoading: value,
+    });
   }
 
+  protected bindToSubmitPromise = (submitPromise: Promise<void>) => {
+    this.setIsLoading(true);
+    submitPromise.then(() => this.setIsLoading(false)).catch(() => this.setIsLoading(false));
+  };
 
   protected onLastInputEndEditing() {
     this.onSubmit();
@@ -66,17 +70,16 @@ export class CForm<T extends BaseFormData> extends CSubForm<T, CMainFormProps<T>
 
   protected onSubmit = () => {
     const { isValid, onSubmit } = this.props;
-    const { isLoading } = this.state;
-    let result: Promise<void> | undefined | void = void 0;
-    if (onSubmit && !isLoading) {
-      const {isLoading, ...tValue} = this.state as CFormState;
+    const { value } = this.state;
 
+    let result: Promise<void> | undefined | void = void 0;
+    if (onSubmit && !this.isLoading) {
       if (isValid) {
-        if (isValid(tValue as T)) {
-          result = onSubmit(tValue as T);
+        if (isValid(value)) {
+          result = onSubmit(value);
         }
       } else {
-        result = onSubmit(tValue as T);
+        result = onSubmit(value);
       }
     }
 
@@ -87,16 +90,15 @@ export class CForm<T extends BaseFormData> extends CSubForm<T, CMainFormProps<T>
 
   protected getNewProps(child: React.ReactElement<any>, indexInParent: number) {
     const newProps = super.getNewProps(child, indexInParent);
-    const { isLoading } = this.state;
 
     const { isValid, disabled } = this.props;
 
-    if (isObject(child.type) && (child.type as any).prototype instanceof CFormManagedInput) {
-      newProps.disabled = child.props.disabled || isLoading;
+    if (CFormManagedInput.isPrototypeOf(child.type)) {
+      newProps.disabled = child.props.disabled || this.isLoading;
     }
 
-    if (isObject(child.type) && (child.type as any).prototype instanceof CFormManagedControl) {
-      newProps.isLoading = child.props.isLoading || isLoading;
+    if (CFormManagedControl.isPrototypeOf(child.type)) {
+      newProps.isLoading = child.props.isLoading || this.isLoading;
 
       if (child.props.submit) {
         newProps.onClick = (...args: any[]) => {
@@ -108,25 +110,12 @@ export class CForm<T extends BaseFormData> extends CSubForm<T, CMainFormProps<T>
       }
 
       if (isValid) {
-        const {isLoading, ...tValue} = this.state as CFormState;
-        const notValid = !isValid(tValue as T);
+        const { value } = this.state;
+        const notValid = !isValid(value);
         newProps.disabled = child.props.disabled || disabled || notValid;
       }
     }
 
     return newProps;
   }
-
-
-  protected setIsLoading(value: boolean) {
-    this.setState({ isLoading: value });
-  }
-
-  protected bindToSubmitPromise = (submitPromise: Promise<void>) => {
-    this.setIsLoading(true);
-    submitPromise.then(() => this.setIsLoading(false)).catch(() => {
-      this.setIsLoading(false);
-      this.focus(); // focus the first input
-    });
-  };
 }
