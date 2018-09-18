@@ -4,10 +4,11 @@
 1. Reduce boilerplate code.
 2. Make it easy to work with auto-generated API intefaces.
 3. Take care of reaction on validation, submission, disabling a form.
-4. Make basic type checking via typescript.
+4. Provide basic type checking via typescript.
 
 ## Basic Usage of CForm
-Both CForm and CSubForm are not UI components, they render React.Component
+Both CForm and CSubForm are not UI components, they render React.Fragment
+You may implement your own render in inherited forms or wrap it in required components.
 
 Please, refer to [CFormExample.tsx](./src/example/CFormExample.tsx)
 
