@@ -101,12 +101,16 @@ export class CForm<T extends BaseFormValue> extends CSubForm<T, CFormProps<T>, C
       newProps.isLoading = child.props.isLoading || this.isLoading;
 
       if (child.props.submit) {
-        newProps.onClick = (...args: any[]) => {
+        newProps.onPress = newProps.onClick = (...args: any[]) => {
           if (child.props.onClick) {
             child.props.onClick.call(args);
           }
+          if (child.props.onPress) {
+            child.props.onPress.call(args);
+          }
           this.onSubmit();
         };
+
       }
 
       if (isValid) {
